@@ -1212,6 +1212,11 @@ void Gource::addFileAction(const std::string& username, const RCommitFile& cf, R
 
     commit_seq++;
 
+    if (cf.action == "C") {
+        gGourceSettings.background_colour = cf.colour;
+        return;
+    }
+
     if(cf.action == "D") {
         userAction = new RemoveAction(user, file, t);
     } else {
