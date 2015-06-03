@@ -54,6 +54,22 @@ options:
     --transparent
             Make the background transparent. Only really useful for screenshots.
 
+    --start-date 'YYYY-MM-DD hh:mm:ss +tz'
+            Start with the first entry after the supplied date and optional time.
+
+            If a time zone offset isn't specified the local time zone is used.
+
+            Example accepted formats:
+
+                "2012-06-30"
+                "2012-06-30 12:00"
+                "2012-06-30 12:00:00 +12"
+
+    --stop-date 'YYYY-MM-DD hh:mm:ss +tz'
+            Stop after the last entry prior to the supplied date and optional time.
+
+            Uses the same format as --start-date.
+
     -p, --start-position POSITION
             Begin at some position in the log (between 0.0 and 1.0 or 'random').
 
@@ -140,12 +156,15 @@ options:
 
     --highlight-colour FFFFFF
             Font colour for highlighted users in hex.
-    
+
     --selection-colour FFFFFF
             Font colour for selected users and files.
 
     --dir-colour FFFFFF
             Font colour for directories.
+
+    --dir-name-depth DEPTH
+            Draw names of directories down to a specific depth in the tree.
 
     --file-filter REGEX
             Filter out any files matching a specified regular expression.
@@ -157,7 +176,7 @@ options:
             Filter out any users matching a specified regular expression.
 
     --user-image-dir DIRECTORY
-            Directory containing .jpg or .png images of users 
+            Directory containing .jpg or .png images of users
             (eg 'Full Name.png') to use as avatars.
 
     --default-user-image IMAGE
@@ -184,7 +203,7 @@ options:
     --bloom-intensity FLOAT
             Adjust the intensity of the bloom.
 
-    --max-files
+    --max-files NUMBER
             Set the maximum number of files or 0 for no limit.
 
             Excess files will be discarded.
@@ -340,7 +359,7 @@ version control systems:
 Interface:
 
 The time shown in the top left of the screen is set initially from the first
-log entry read and is incremented according to the simulation speed 
+log entry read and is incremented according to the simulation speed
 (--seconds-per-day).
 
 Pressing SPACE at any time will pause/resume the simulation. While paused you
@@ -365,9 +384,8 @@ Interactive keyboard commands:
     (+-)  Adjust simulation speed.
     (<>)  Adjust time scale.
     (TAB) Cycle through visible users
-    
-    (Alt+Enter) Toggle Fullscreen
-    
+    (F12) Screenshot
+    (Alt+Enter) Fullscreen toggle
     (ESC) Quit
 
 4. Copyright

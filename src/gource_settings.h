@@ -18,17 +18,9 @@
 #ifndef GOURCE_SETTINGS_H
 #define GOURCE_SETTINGS_H
 
-#define GOURCE_VERSION "0.40"
+#define GOURCE_VERSION "0.44"
 
-#include <dirent.h>
-
-#include "formats/hg.h"
-#include "formats/git.h"
-#include "formats/bzr.h"
-#include "formats/cvs-exp.h"
-#include "formats/cvs2cl.h"
-#include "formats/svn.h"
-
+#include "core/texture.h"
 #include "core/settings.h"
 #include "core/regex.h"
 
@@ -62,10 +54,16 @@ public:
     std::string logo;
     vec2 logo_offset;
 
+    std::string start_date;
+    std::string stop_date;
+    time_t start_timestamp;
+    time_t stop_timestamp;
+
     float start_position;
     float stop_position;
     float stop_at_time;
 
+    bool shutdown;
     bool stop_on_idle;
     bool stop_at_end;
     bool dont_stop;
@@ -127,6 +125,8 @@ public:
     vec3 highlight_colour;
     vec3 selection_colour;
 
+    int dir_name_depth;
+
     std::vector<std::string> highlight_users;
     std::vector<std::string> follow_users;
     std::vector<Regex*> file_filters;
@@ -144,7 +144,7 @@ public:
     TextureResource* file_graphic;
 
     int log_level;
-
+    
     GourceSettings();
 
     void setGourceDefaults();

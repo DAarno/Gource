@@ -1,5 +1,27 @@
+0.44:
+ * Fixed crash when taking a screenshot with an odd resolution.
+
+0.43:
+ * Updated boost autoconf macros to fix multi-arch detection.
+
+0.42:
+ * Fixed bzr log command when no start date was specified (chrisf).
+ * Fixed hg log commit order when date range specified.
+ * Fixed hg log command line on Windows.
+ * Fixed parser bug in date range filtering code.
+
+0.41:
+ * Multi-monitor support using SDL 2.0 when available.
+ * SDL 1.2 support is deprecated.
+ * Full screen mode now uses desktop resolution by default.
+ * Added --start-date, --stop-date 'YYYY-MM-DD hh:mm:ss' options.
+ * Added --dir-name-depth option.
+ * Changed --file-idle-time default value to 0.
+ * Changed screenshot format to PNG.
+
 0.40:
  * Added caption support.
+ * Improved command line interoperability on Windows.
  * Fixed directory deletion short circuiting processing the rest of a commit.
  * Fixed issue loading non-ascii user image filenames on windows.
  * Ignore UTF-8 byte order mark at the start of lines in custom log files.

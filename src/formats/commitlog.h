@@ -85,6 +85,8 @@ public:
     RCommitLog(const std::string& logfile, int firstChar = -1);
     virtual ~RCommitLog();
 
+    static std::string filter_utf8(const std::string& str);
+
     void seekTo(float percent);
 
     bool checkFormat();
@@ -94,9 +96,12 @@ public:
     int systemCommand(const std::string& command);
     void requireExecutable(const std::string& exename);
 
+    void bufferCommit(RCommit& commit);
+
     bool getCommitAt(float percent, RCommit& commit);
     bool findNextCommit(RCommit& commit, int attempts);
     bool nextCommit(RCommit& commit, bool validate = true);
+    bool hasBufferedCommit();
     bool isFinished();
     bool isSeekable();
     float getPercent();

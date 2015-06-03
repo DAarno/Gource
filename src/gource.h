@@ -18,10 +18,6 @@
 #ifndef GOURCE_H
 #define GOURCE_H
 
-#ifdef _WIN32
-#include "windows.h"
-#endif
-
 #include <deque>
 #include <list>
 #include <fstream>
@@ -36,7 +32,6 @@
 #include "core/regex.h"
 #include "core/ppm.h"
 #include "core/mousecursor.h"
-#include "core/tga.h"
 
 #include "gource_settings.h"
 
@@ -60,7 +55,6 @@ class Gource : public SDLApp {
     FrameExporter* frameExporter;
 
     RLogMill* logmill;
-    bool shutdown;
 
     RCommitLog* commitlog;
     PositionSlider slider;
@@ -142,6 +136,9 @@ class Gource : public SDLApp {
 
     bool first_read;
     bool paused;
+    bool reloaded;
+
+    bool take_screenshot;
 
     float max_tick_rate;
     int frameskip;
@@ -187,7 +184,7 @@ class Gource : public SDLApp {
     std::map<std::string, RFile*> files;
     std::map<int, RFile*> tagfilemap;
     std::map<int, RUser*> tagusermap;
-    
+
     std::list<RCaption*> captions;
     std::list<RCaption*> active_captions;
 
@@ -213,7 +210,7 @@ class Gource : public SDLApp {
     void selectNextUser();
 
     void loadCaptions();
-    
+
     void readLog();
 
     void logReadingError(const std::string& error);
@@ -263,6 +260,8 @@ class Gource : public SDLApp {
     void screenshot();
 
     void changeColours();
+
+    void grabMouse(bool grab_mouse);
 public:
     Gource(FrameExporter* frameExporter = 0);
     ~Gource();
@@ -291,7 +290,7 @@ public:
     void keyPress(SDL_KeyboardEvent *e);
     void mouseMove(SDL_MouseMotionEvent *e);
     void mouseClick(SDL_MouseButtonEvent *e);
-#if SDL_VERSION_ATLEAST(1,3,0)
+#if SDL_VERSION_ATLEAST(2,0,0)
     void mouseWheel(SDL_MouseWheelEvent *e);
 #endif
 };

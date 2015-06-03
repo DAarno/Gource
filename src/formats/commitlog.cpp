@@ -21,7 +21,7 @@
 
 #include "../core/utf8/utf8.h"
 
-std::string filter_utf8(const std::string& str) {
+std::string RCommitLog::filter_utf8(const std::string& str) {
 
     std::string filtered;
 
@@ -91,10 +91,8 @@ RCommitLog::~RCommitLog() {
 }
 
 int RCommitLog::systemCommand(const std::string& command) {
-#ifdef _WIN32
-    SDLAppCreateWindowsConsole();
-#endif
-    return system(command.c_str());
+    int rc = system(command.c_str());
+    return rc;
 }
 
 // TODO: implement check for 'nix OSs
@@ -124,7 +122,6 @@ bool RCommitLog::checkFirstChar(int firstChar, std::istream& stream) {
 }
 
 bool RCommitLog::checkFormat() {
-
     if(!success) return false;
 
     //read a commit to see if the log is in the correct format
@@ -210,6 +207,11 @@ bool RCommitLog::findNextCommit(RCommit& commit, int attempts) {
     return false;
 }
 
+void RCommitLog::bufferCommit(RCommit& commit) {
+    lastCommit = commit;
+    buffered = true;
+}
+
 bool RCommitLog::nextCommit(RCommit& commit, bool validate) {
 
     if(buffered) {
@@ -217,6 +219,9 @@ bool RCommitLog::nextCommit(RCommit& commit, bool validate) {
         buffered = false;
         return true;
     }
+
+    // ensure commit is re-initialized
+    commit = RCommit();
 
     bool success = parseCommit(commit);
 
@@ -235,13 +240,17 @@ bool RCommitLog::isFinished() {
     return false;
 }
 
+bool RCommitLog::hasBufferedCommit() {
+    return buffered;
+}
+
 //create temp file
 void RCommitLog::createTempLog() {
 
     std::string tempdir;
 
 #ifdef _WIN32
-    DWORD tmplen = GetTempPath(0, "");
+    DWORD tmplen = GetTempPath(0, 0);
 
     if(tmplen == 0) return;
 
@@ -273,7 +282,7 @@ void RCommitLog::createTempLog() {
 
 RCommitFile::RCommitFile(const std::string& filename, const std::string& action, vec3 colour) {
 
-    this->filename = filter_utf8(filename);
+    this->filename = RCommitLog::filter_utf8(filename);
 
     //prepend a root slash
     if(this->filename[0] != '/') {
@@ -323,7 +332,7 @@ void RCommit::addFile(const std::string& filename, const  std::string& action, c
 }
 
 void RCommit::postprocess() {
-    username = filter_utf8(username);
+    username = RCommitLog::filter_utf8(username);
 }
 
 bool RCommit::isValid() {

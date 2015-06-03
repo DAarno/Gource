@@ -28,19 +28,35 @@ Windowed
 \fB\-\-transparent\fR
 Make the background transparent. Only really useful for screenshots.
 .TP
+\fB\-\-start\-date 'YYYY\-MM\-DD hh:mm:ss +tz'\fR
+Start with the first entry after the supplied date and optional time.
+
+If a time zone offset isn't specified the local time zone is used.
+
+Example accepted formats:
+
+    "2012-06-30"
+    "2012-06-30 12:00"
+    "2012-06-30 12:00:00 +12"
+.TP
+\fB\-\-stop\-date 'YYYY\-MM\-DD hh:mm:ss +tz'\fR
+Stop at the last entry prior to the supplied date and optional time.
+
+Uses the same format as \-\-start\-date.
+.TP
 \fB\-p, \-\-start\-position POSITION\fR
 Begin at some position in the log (between 0.0 and 1.0 or 'random').
 .TP
-\fB    \-\-stop\-position  POSITION\fR
+\fB\-\-stop\-position  POSITION\fR
 Stop (exit) at some position in the log (does not work with STDIN).
 .TP
 \fB\-t, \-\-stop\-at\-time SECONDS\fR
 Stop (exit) after a specified number of seconds.
 .TP
-\fB    \-\-stop\-at\-end\fR
+\fB\-\-stop\-at\-end\fR
 Stop (exit) at the end of the log / stream.
 .TP
-\fB    \-\-loop\fR
+\fB\-\-loop\fR
 Loop back to the start of the log when the end is reached.
 .TP
 \fB\-a, \-\-auto\-skip\-seconds SECONDS\fR
@@ -49,7 +65,7 @@ Automatically skip to next entry if nothing happens for a specified number of se
 \fB\-s, \-\-seconds\-per\-day SECONDS\fR
 Speed of simulation in seconds per day.
 .TP
-\fB\    \-\-realtime\fR
+\fB\-\-realtime\fR
 Realtime playback speed.
 .TP
 \fB\-c, \-\-time\-scale SCALE\fR
@@ -118,6 +134,9 @@ Font colour for selected users and files.
 \fB\-\-dir\-colour FFFFFF\fR
 Font colour for directories.
 .TP
+\fB\-\-dir\-name\-depth DEPTH\fR
+Draw names of directories down to a specific depth in the tree.
+.TP
 \fB\-\-file\-extensions\fR
 Show filename extensions only.
 .TP
@@ -154,7 +173,7 @@ Adjust the amount of bloom.
 \fB\-\-bloom\-intensity FLOAT\fR
 Adjust the intensity of the bloom.
 .TP
-\fB\-\-max\-files\fR
+\fB\-\-max\-files NUMBER\fR
 Set the maximum number of files or 0 for no limit. Excess files will be discarded.
 .TP
 \fB\-\-max\-file\-lag SECONDS\fR
@@ -346,6 +365,10 @@ Interactive keyboard commands:
 (<>)  Adjust time scale
 .ti 10
 (TAB) Cycle through visible users
+.ti 10
+(F12) Screenshot
+.ti 10
+(Alt+Enter) Fullscreen toggle
 .ti 10
 (ESC) Quit
 .SH AUTHOR

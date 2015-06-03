@@ -21,6 +21,10 @@ int main(int argc, char *argv[]) {
 
     SDLAppInit("Gource", "gource");
 
+#ifdef _WIN32
+        SDLApp::initConsole();
+#endif
+
     ConfFile conf;
     std::vector<std::string> files;
 
@@ -59,9 +63,16 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-    
+
         //set log level
         Logger::getDefault()->setLevel(gGourceSettings.log_level);
+
+#ifdef _WIN32
+        // hide console if not needed
+        if(gGourceSettings.log_level == LOG_LEVEL_OFF && !SDLApp::existing_console) {
+            SDLApp::showConsole(false);
+        }
+#endif
 
         //load config
         if(!gGourceSettings.load_config.empty()) {
@@ -98,7 +109,7 @@ int main(int argc, char *argv[]) {
         }
 
         //write custom log file
-        if(gGourceSettings.output_custom_filename.size() > 0 && gGourceSettings.path.size() > 0) {
+        if(!gGourceSettings.output_custom_filename.empty() && !gGourceSettings.path.empty()) {
 
             Gource::writeCustomLog(gGourceSettings.path, gGourceSettings.output_custom_filename);
             exit(0);
@@ -126,11 +137,15 @@ int main(int argc, char *argv[]) {
     if(gGourceSettings.resizable && gGourceSettings.output_ppm_filename.empty()) {
         display.enableResize(true);
     }
-        
+
     try {
 
         display.init("Gource", gGourceSettings.display_width, gGourceSettings.display_height, gGourceSettings.fullscreen);
 
+#if SDL_VERSION_ATLEAST(2,0,0)
+        SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
+#endif
+        
     } catch(SDLInitException& exception) {
 
         char errormsg[1024];
@@ -138,10 +153,6 @@ int main(int argc, char *argv[]) {
 
         SDLAppQuit(errormsg);
     }
-
-#ifdef _WIN32
-    SDLAppAttachToConsole();
-#endif
 
     //init frame exporter
     FrameExporter* exporter = 0;
@@ -186,7 +197,7 @@ int main(int argc, char *argv[]) {
             SDLAppQuit(exception.what());
         }
     }
-    
+
     gGourceShell = 0;
 
     if(gourcesh != 0) delete gourcesh;

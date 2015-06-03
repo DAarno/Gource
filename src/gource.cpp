@@ -16,6 +16,7 @@
 */
 
 #include "gource.h"
+#include "core/png_writer.h"
 
 bool  gGourceDrawBackground  = true;
 bool  gGourceQuadTreeDebug   = false;
@@ -47,7 +48,7 @@ Gource::Gource(FrameExporter* exporter) {
     fontcaption.dropShadow(true);
     fontcaption.roundCoordinates(false);
     fontcaption.alignTop(false);
-    
+
     font = fontmanager.grab("FreeSans.ttf", 14);
     font.dropShadow(true);
     font.roundCoordinates(true);
@@ -88,6 +89,7 @@ Gource::Gource(FrameExporter* exporter) {
 
     stop_position_reached=false;
 
+    reloaded     = false;
     paused       = false;
     first_read   = true;
 
@@ -95,6 +97,8 @@ Gource::Gource(FrameExporter* exporter) {
     mousemoved   = false;
     mousedragged = false;
     mouseclicked = false;
+
+    take_screenshot = false;
 
     if(gGourceSettings.hide_mouse) {
         cursor.showCursor(false);
@@ -139,8 +143,6 @@ Gource::Gource(FrameExporter* exporter) {
     reset();
 
     logmill = new RLogMill(logfile);
-
-    shutdown = false;
 
     if(exporter!=0) setFrameExporter(exporter, gGourceSettings.output_framerate);
 
@@ -217,12 +219,10 @@ void Gource::unload() {
 }
 
 void Gource::reload() {
-
-    slider.resize();
+    reloaded = true;
 }
 
 void Gource::quit() {
-    shutdown = true;
 }
 
 void Gource::update(float t, float dt) {
@@ -251,7 +251,7 @@ void Gource::update(float t, float dt) {
     draw(runtime, scaled_dt);
 
     //extract frames based on frameskip setting if frameExporter defined
-    if(frameExporter != 0 && commitlog && !shutdown) {
+    if(frameExporter != 0 && commitlog && !gGourceSettings.shutdown) {
         if(framecount % (frameskip+1) == 0) {
             frameExporter->dump();
         }
@@ -286,14 +286,42 @@ std::string Gource::dateAtPosition(float percent) {
     return date;
 }
 
+void Gource::grabMouse(bool grab_mouse) {
+    this->grab_mouse = grab_mouse;
+
+#if SDL_VERSION_ATLEAST(2,0,0)
+    if(grab_mouse) {
+        if(!SDL_GetRelativeMouseMode()) {
+            // NOTE: SDL_SetWindowGrab needed as well to work around this bug:
+            // http://bugzilla.libsdl.org/show_bug.cgi?id=1967
+
+            SDL_SetWindowGrab(display.sdl_window, SDL_TRUE);
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+        }
+    } else {
+        if(SDL_GetRelativeMouseMode()) {
+            SDL_SetWindowGrab(display.sdl_window, SDL_FALSE);
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+        }
+    }
+#endif
+
+#if not SDL_VERSION_ATLEAST(2,0,0)
+    if(!grab_mouse) {
+        // restore old mouse position
+        SDL_WarpMouse(mousepos.x, mousepos.y);
+    }
+#endif
+
+    cursor.showCursor(!grab_mouse);
+}
+
 void Gource::mouseMove(SDL_MouseMotionEvent *e) {
     if(commitlog==0) return;
     if(gGourceSettings.hide_mouse) return;
 
-    bool rightmouse = cursor.rightButtonPressed();
-
-#if not SDL_VERSION_ATLEAST(1,3,0)
     if(grab_mouse) {
+#if not SDL_VERSION_ATLEAST(2,0,0)
          int warp_x = display.width/2;
          int warp_y = display.height/2;
 
@@ -301,8 +329,10 @@ void Gource::mouseMove(SDL_MouseMotionEvent *e) {
          if(e->x == warp_x && e->y == warp_y) return;
 
          SDL_WarpMouse(warp_x, warp_y);
-    }
 #endif
+    }
+
+    bool rightmouse = cursor.rightButtonPressed();
 
     //move camera in direction the user dragged the mouse
     if(mousedragged || rightmouse) {
@@ -366,13 +396,8 @@ void Gource::zoom(bool zoomin) {
     camera.setDistance(distance);
 }
 
-#if SDL_VERSION_ATLEAST(1,3,0)
+#if SDL_VERSION_ATLEAST(2,0,0)
 void Gource::mouseWheel(SDL_MouseWheelEvent *e) {
-
-   int mouse_x, mouse_y;
-    SDL_GetMouseState(&mouse_x, &mouse_y);
-
-    vec2 mousepos(mouse_x, mouse_y);
 
     if(e->y > 0) {
         zoom(true);
@@ -402,20 +427,15 @@ void Gource::mouseClick(SDL_MouseButtonEvent *e) {
 
         if(e->button == SDL_BUTTON_LEFT || e->button == SDL_BUTTON_RIGHT) {
             if(!cursor.buttonPressed()) {
-                grab_mouse=false;
-#if SDL_VERSION_ATLEAST(1,3,0)
-		SDL_SetRelativeMouseMode(SDL_FALSE);
-		SDL_WarpMouseInWindow(display.sdl_window, mousepos.x, mousepos.y);
-#else
-		SDL_WarpMouse(mousepos.x, mousepos.y);
-#endif
-                cursor.showCursor(true);
+                grabMouse(false);
             }
         }
     }
 
     if(e->type != SDL_MOUSEBUTTONDOWN) return;
 
+
+#if not SDL_VERSION_ATLEAST(2,0,0)
     //wheel up
     if(e->button == SDL_BUTTON_WHEELUP) {
         zoom(true);
@@ -427,6 +447,7 @@ void Gource::mouseClick(SDL_MouseButtonEvent *e) {
         zoom(false);
         return;
     }
+#endif
 
     if(e->button == SDL_BUTTON_MIDDLE) {
         toggleCameraMode();
@@ -435,11 +456,7 @@ void Gource::mouseClick(SDL_MouseButtonEvent *e) {
 
 
     if(e->button == SDL_BUTTON_RIGHT) {
-        cursor.showCursor(false);
-        grab_mouse=true;
-#if SDL_VERSION_ATLEAST(1,3,0)
-        SDL_SetRelativeMouseMode(SDL_TRUE);
-#endif
+        grabMouse(true);
         return;
     }
 
@@ -510,9 +527,9 @@ void Gource::selectBackground() {
 
     manual_camera = true;
 
-    cursor.showCursor(false);
-    grab_mouse=true;
     mousedragged=true;
+
+    grabMouse(true);
 }
 
 //select a user, deselect current file/user
@@ -616,18 +633,19 @@ void Gource::keyPress(SDL_KeyboardEvent *e) {
 
     if (e->type == SDL_KEYDOWN) {
 
-#if SDL_VERSION_ATLEAST(1,3,0)
-        bool key_escape       = e->keysym.scancode == SDL_SCANCODE_ESCAPE;
-        bool key_tab          = e->keysym.scancode == SDL_SCANCODE_TAB;
-        bool key_space        = e->keysym.scancode == SDL_SCANCODE_SPACE;
-        bool key_plus         = e->keysym.scancode == SDL_SCANCODE_EQUALS;
-        bool key_equals       = e->keysym.scancode == SDL_SCANCODE_EQUALS;
-        bool key_minus        = e->keysym.scancode == SDL_SCANCODE_MINUS;
-        bool key_leftbracket  = e->keysym.scancode == SDL_SCANCODE_LEFTBRACKET;
-        bool key_rightbracket = e->keysym.scancode == SDL_SCANCODE_RIGHTBRACKET;
-        bool key_comma        = e->keysym.scancode == SDL_SCANCODE_COMMA;
-        bool key_period       = e->keysym.scancode == SDL_SCANCODE_PERIOD;
-        bool key_slash        = e->keysym.scancode == SDL_SCANCODE_SLASH;
+
+#if SDL_VERSION_ATLEAST(2,0,0)
+        bool key_escape       = e->keysym.sym == SDLK_ESCAPE;
+        bool key_tab          = e->keysym.sym == SDLK_TAB;
+        bool key_space        = e->keysym.sym == SDLK_SPACE;
+        bool key_plus         = e->keysym.sym == SDLK_PLUS;
+        bool key_equals       = e->keysym.sym == SDLK_EQUALS;
+        bool key_minus        = e->keysym.sym == SDLK_MINUS;
+        bool key_leftbracket  = e->keysym.sym == SDLK_LEFTBRACKET;
+        bool key_rightbracket = e->keysym.sym == SDLK_RIGHTBRACKET;
+        bool key_comma        = e->keysym.sym == SDLK_COMMA;
+        bool key_period       = e->keysym.sym == SDLK_PERIOD;
+        bool key_slash        = e->keysym.sym == SDLK_SLASH;
 #else
         bool key_escape       = e->keysym.unicode == SDLK_ESCAPE;
         bool key_tab          = e->keysym.unicode == SDLK_TAB;
@@ -641,7 +659,6 @@ void Gource::keyPress(SDL_KeyboardEvent *e) {
         bool key_period       = e->keysym.unicode == SDLK_PERIOD;
         bool key_slash        = e->keysym.unicode == SDLK_SLASH;
 #endif
-
         if (key_escape) {
             quit();
         }
@@ -649,7 +666,7 @@ void Gource::keyPress(SDL_KeyboardEvent *e) {
         if(commitlog==0) return;
 
         if(e->keysym.sym == SDLK_F12) {
-            screenshot();
+            take_screenshot = true;
         }
 
         if (e->keysym.sym == SDLK_q) {
@@ -899,7 +916,7 @@ void Gource::reset() {
     for(std::list<RCaption*>::iterator it = captions.begin(); it!=captions.end();it++) {
         delete (*it);
     }
-   
+
     for(std::list<RCaption*>::iterator it = active_captions.begin(); it!=active_captions.end();it++) {
         delete (*it);
     }
@@ -1040,7 +1057,7 @@ void Gource::seekTo(float percent) {
     commitlog->seekTo(percent);
 }
 
-Regex caption_regex("^([0-9]+)\\|(.+)$");
+Regex caption_regex("^(?:\\xEF\\xBB\\xBF)?([0-9]+)\\|(.+)$");
 
 void Gource::loadCaptions() {
     if(!gGourceSettings.caption_file.size()) return;
@@ -1048,31 +1065,32 @@ void Gource::loadCaptions() {
     std::ifstream cf(gGourceSettings.caption_file.c_str());
 
     if(!cf.is_open()) return;
-    
+
     std::string line;
     std::vector<std::string> matches;
 
     time_t last_timestamp = 0;
-    
+
     while(std::getline(cf, line)) {
-        
+
         ConfFile::trim(line);
 
         if(!caption_regex.match(line, &matches)) continue;
-        
-        time_t timestamp = atol(matches[0].c_str());
-        
+
+        time_t timestamp    = atol(matches[0].c_str());
+        std::string caption = RCommitLog::filter_utf8(matches[1]);
+
         //ignore older captions
-        if(timestamp<currtime) continue;
+        if(timestamp < currtime) continue;
 
         //ignore out of order captions
-        if(timestamp<last_timestamp) continue;
+        if(timestamp < last_timestamp) continue;
 
         last_timestamp = timestamp;
 
         //fprintf(stderr, "%d %s\n", timestamp, matches[1].c_str());
 
-        captions.push_back(new RCaption(matches[1], timestamp, fontcaption));
+        captions.push_back(new RCaption(caption, timestamp, fontcaption));
     }
 
     //fprintf(stderr, "loaded %d captions\n", captions.size());
@@ -1085,7 +1103,7 @@ void Gource::readLog() {
     //debugLog("readLog()\n");
 
     // read commits until either we are ahead of currtime
-    while(!commitlog->isFinished() && (commitqueue.empty() || (commitqueue.back().timestamp <= currtime && commitqueue.size() < commitqueue_max_size)) ) {
+    while((commitlog->hasBufferedCommit() || !commitlog->isFinished()) && (commitqueue.empty() || (commitqueue.back().timestamp <= currtime && commitqueue.size() < commitqueue_max_size)) ) {
 
         RCommit commit;
 
@@ -1096,7 +1114,12 @@ void Gource::readLog() {
             continue;
         }
 
-         commitqueue.push_back(commit);
+        if(gGourceSettings.stop_timestamp != 0 && commit.timestamp > gGourceSettings.stop_timestamp) {
+            stop_position_reached = true;
+            break;
+        }
+
+        commitqueue.push_back(commit);
     }
 
     if(first_read && commitqueue.empty()) {
@@ -1112,8 +1135,14 @@ void Gource::readLog() {
 
     bool is_finished = commitlog->isFinished();
 
-    if(   (gGourceSettings.stop_at_end && is_finished)
-       || (gGourceSettings.stop_position > 0.0 && commitlog->isSeekable() && (is_finished || last_percent >= gGourceSettings.stop_position)) ) {
+
+    if(
+       // end reached
+       (gGourceSettings.stop_at_end && is_finished)
+
+       // stop position reached
+       || (gGourceSettings.stop_position > 0.0 && commitlog->isSeekable() && (is_finished || last_percent >= gGourceSettings.stop_position))
+    ) {
         stop_position_reached = true;
     }
 
@@ -1508,7 +1537,7 @@ void Gource::changeColours() {
 
 void Gource::logic(float t, float dt) {
 
-    if(shutdown && logmill->isFinished()) {
+    if(gGourceSettings.shutdown && logmill->isFinished()) {
         appFinished=true;
         return;
     }
@@ -1556,8 +1585,8 @@ void Gource::logic(float t, float dt) {
     bool up    = false;
     bool down  = false;
 
-#if SDL_VERSION_ATLEAST(1,3,0)
-    Uint8 *keystate = SDL_GetKeyboardState(0);
+#if SDL_VERSION_ATLEAST(2,0,0)
+    const Uint8 *keystate = SDL_GetKeyboardState(0);
 
     right = keystate[SDL_SCANCODE_RIGHT];
     left  = keystate[SDL_SCANCODE_LEFT];
@@ -1647,7 +1676,7 @@ void Gource::logic(float t, float dt) {
     if(currtime==0 && !commitqueue.empty()) {
         currtime   = lasttime = commitqueue[0].timestamp;
         subseconds = 0.0;
-        
+
         loadCaptions();
     }
 
@@ -1693,66 +1722,89 @@ void Gource::logic(float t, float dt) {
         commitqueue.pop_front();
     }
 
+    slider.resize();
+
+    float caption_height  = fontcaption.getMaxHeight();
+    float caption_start_y = canSeek() ? slider.getBounds().min.y - 35.0f : display.height - fontmedium.getMaxHeight() - 20.0f;
+
+    if(!gGourceSettings.title.empty()) {
+        caption_start_y = glm::min( caption_start_y, display.height - 20.0f - fontmedium.getMaxHeight() );
+    }
+
+    caption_start_y = glm::floor(caption_start_y);
+
+    if(reloaded) {
+        // reposition active captions
+        float y = caption_start_y;
+
+        for(RCaption* cap : active_captions) {
+
+            int caption_offset_x = gGourceSettings.caption_offset;
+
+            // centre
+            if(caption_offset_x == 0) {
+                caption_offset_x = (display.width / 2) - (fontcaption.getWidth(cap->getCaption()) / 2);
+            } else if(caption_offset_x < 0) {
+                caption_offset_x = display.width + caption_offset_x - fontcaption.getWidth(cap->getCaption());
+            }
+
+            cap->setPos(vec2(caption_offset_x, y));
+            y -= caption_height;
+        }
+
+        reloaded = false;
+    }
+
     while(captions.size() > 0) {
         RCaption* caption = captions.front();
-        
+
         if(caption->timestamp > currtime) break;
 
-        float cap_height = fontcaption.getMaxHeight();
-        
-        float y = display.height - 10;
+        float y = caption_start_y;
 
-        // add extra space if title is enabled
-        if(!gGourceSettings.title.empty()) {
-            y -= fontmedium.getMaxHeight() + cap_height;
-        }
-        
         while(1) {
 
             bool found = false;
-            
-            for(std::list<RCaption*>::iterator it = active_captions.begin(); it!=active_captions.end(); it++) {
-                RCaption* actcap = *it;
 
-                vec2 cappos = actcap->getPos();
-                
-                if(cappos.y == y) {
+            for(RCaption* cap : active_captions) {
+
+                if(cap->getPos().y == y) {
                     found = true;
                     break;
                 }
             }
-            
+
             if(!found) break;
 
-            y -= cap_height;
+            y -= caption_height;
         }
 
-        int offset_x = gGourceSettings.caption_offset;
+        int caption_offset_x = gGourceSettings.caption_offset;
 
         // centre
-        if(offset_x == 0) {
-            offset_x = (display.width / 2) - (fontcaption.getWidth(caption->getCaption()) / 2);           
-        } else if(offset_x < 0) {
-            offset_x = display.width - offset_x;
+        if(caption_offset_x == 0) {
+            caption_offset_x = (display.width / 2) - (fontcaption.getWidth(caption->getCaption()) / 2);
+        } else if(caption_offset_x < 0) {
+            caption_offset_x = display.width + caption_offset_x - fontcaption.getWidth(caption->getCaption());
         }
-        
-        caption->setPos(vec2(offset_x, y));
 
-        captions.pop_front();        
+        caption->setPos(vec2(caption_offset_x, y));
+
+        captions.pop_front();
         active_captions.push_back(caption);
     }
-    
+
     for(std::list<RCaption*>::iterator it = active_captions.begin(); it!=active_captions.end();) {
          RCaption* caption = *it;
-         
+
          caption->logic(dt);
-         
+
          if(caption->isFinished()) {
              it = active_captions.erase(it);
              delete caption;
              continue;
          }
-         
+
          it++;
     }
 
@@ -1912,7 +1964,7 @@ void Gource::loadingScreen() {
             break;
     }
 
-    const char* action = !shutdown ? "Reading Log" : "Aborting";
+    const char* action = !gGourceSettings.shutdown ? "Reading Log" : "Aborting";
 
     int width = font.getWidth(action);
     font.setColour(vec4(1.0f));
@@ -2040,8 +2092,9 @@ void Gource::updateAndDrawEdges() {
 
         edge_vbo.update();
 
-        shadow_shader->use();
+        shadow_shader->setSampler2D("tex", 0);
         shadow_shader->setFloat("shadow_strength", 0.5);
+        shadow_shader->use();
 
         vec2 shadow_offset = vec2(2.0, 2.0);
 
@@ -2130,23 +2183,23 @@ void Gource::setMessage(const char* str, ...) {
 void Gource::screenshot() {
 
     //get next free recording name
-    char tganame[256];
+    char pngname[256];
     struct stat finfo;
-    int tgano = 1;
+    int pngno = 1;
 
-    while(tgano < 10000) {
-        snprintf(tganame, 256, "gource-%04d.tga", tgano);
-        if(stat(tganame, &finfo) != 0) break;
-        tgano++;
+    while(pngno < 10000) {
+        snprintf(pngname, 256, "gource-%04d.png", pngno);
+        if(stat(pngname, &finfo) != 0) break;
+        pngno++;
     }
 
-    //write tga
-    std::string filename(tganame);
+    //write png
+    std::string filename(pngname);
 
-    TGAWriter tga(gGourceSettings.transparent ? 4 : 3);
-    tga.screenshot(filename);
+    PNGWriter png(gGourceSettings.transparent ? 4 : 3);
+    png.screenshot(filename);
 
-    setMessage("Wrote screenshot %s", tganame);
+    setMessage("Wrote screenshot %s", pngname);
 }
 
 void Gource::updateVBOs(float dt) {
@@ -2196,8 +2249,9 @@ void Gource::drawFileShadows(float dt) {
 
     if(!gGourceSettings.ffp) {
 
-        shadow_shader->use();
+        shadow_shader->setSampler2D("tex", 0);
         shadow_shader->setFloat("shadow_strength", 0.5);
+        shadow_shader->use();
 
         glBindTexture(GL_TEXTURE_2D, gGourceSettings.file_graphic->textureid);
 
@@ -2221,8 +2275,9 @@ void Gource::drawUserShadows(float dt) {
 
     if(!gGourceSettings.ffp) {
 
-        shadow_shader->use();
+        shadow_shader->setSampler2D("tex", 0);
         shadow_shader->setFloat("shadow_strength", 0.5);
+        shadow_shader->use();
 
         vec2 shadow_offset = vec2(2.0, 2.0) * gGourceSettings.user_scale;
 
@@ -2410,9 +2465,10 @@ void Gource::draw(float t, float dt) {
 
         text_vbo_draw_time = SDL_GetTicks();
 
-        text_shader->use();
+        text_shader->setSampler2D("tex", 0);
         text_shader->setFloat("shadow_strength", 0.7);
         text_shader->setFloat("texel_size", font_texel_size);
+        text_shader->use();
 
         fontmanager.drawBuffer();
 
@@ -2546,12 +2602,8 @@ void Gource::draw(float t, float dt) {
 
     for(std::list<RCaption*>::iterator it = active_captions.begin(); it!=active_captions.end(); it++) {
         RCaption* caption = *it;
-        
-        caption->draw();        
-    }
 
-    if(message_timer>0.0f) {
-         fontmedium.draw(1, 3, message);
+        caption->draw();
     }
 
     //file key
@@ -2651,4 +2703,19 @@ void Gource::draw(float t, float dt) {
 
     mousemoved=false;
     mouseclicked=false;
+
+    if(take_screenshot) {
+        screenshot();
+        take_screenshot = false;
+    }
+
+    if(message_timer > 0.0f) {
+        font.setColour(vec4(1.0f));
+
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+        glEnable(GL_TEXTURE_2D);
+
+        font.draw(1, 3, message);
+    }
 }
